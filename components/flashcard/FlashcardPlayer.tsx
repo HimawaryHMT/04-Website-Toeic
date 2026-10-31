@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { VocabDeck, VocabWord } from '@/lib/types';
 import { useLearning } from '@/lib/store';
-import { Volume2, Bookmark, BookmarkCheck, ArrowLeft, ArrowRight, RotateCw, X, Sparkles } from 'lucide-react';
+import { Volume2, Bookmark, BookmarkCheck, ArrowLeft, ArrowRight, RotateCw, X } from 'lucide-react';
 
 interface FlashcardPlayerProps {
   deck: VocabDeck;

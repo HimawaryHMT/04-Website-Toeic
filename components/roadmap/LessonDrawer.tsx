@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { GrammarLesson } from '@/lib/types';
 import { useLearning } from '@/lib/store';
-import { X, Play, BookOpen, AlertTriangle, CheckCircle, Star } from 'lucide-react';
+import { X, Play, AlertTriangle, Star } from 'lucide-react';
 
 interface LessonDrawerProps {
   lesson: GrammarLesson | null;

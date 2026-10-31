@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useLearning } from '@/lib/store';
 import { VocabDeck } from '@/lib/types';
 import { FlashcardPlayer } from '@/components/flashcard/FlashcardPlayer';
-import { Bookmark, Volume2, Trash2, Search, Play, BookOpen } from 'lucide-react';
+import { Bookmark, Volume2, Trash2, Search, Play } from 'lucide-react';
 
 export function ReviewHub() {
   const { state, toggleBookmark } = useLearning();
