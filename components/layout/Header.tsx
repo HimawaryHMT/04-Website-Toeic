@@ -48,18 +48,18 @@ export function Header({ currentView, onNavigate }: HeaderProps) {
             <button
               onClick={() => onNavigate('home')}
               className="flex flex-col text-left group cursor-pointer focus:outline-none"
-              aria-label="Về trang chủ ForumFlash"
+              aria-label="Về trang chủ HMT Flash"
             >
               <div className="flex items-center text-xl font-black tracking-tight text-slate-900 dark:text-white">
-                <span>F</span>
-                <span className="inline-flex items-center justify-center w-5 h-5 mx-0.5 rounded-full bg-emerald-500 text-white text-xs font-bold shadow-sm">
+                <span>HMT</span>
+                <span className="inline-flex items-center justify-center w-5 h-5 mx-1 rounded-full bg-emerald-500 text-white text-xs font-bold shadow-sm">
                   ⚡
                 </span>
-                <span>rumFlash</span>
+                <span>Flash</span>
                 <span className="text-emerald-500 font-extrabold">.</span>
               </div>
               <span className="text-[9px] font-bold tracking-widest uppercase text-slate-600 dark:text-slate-300 -mt-0.5">
-                TỪ THE FORUM CENTER
+                TỪ HMT CENTER
               </span>
             </button>
 

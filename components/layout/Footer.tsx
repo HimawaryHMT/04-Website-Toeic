@@ -14,11 +14,11 @@ export function Footer({ onNavigate }: FooterProps) {
           {/* Brand */}
           <div className="text-center md:text-left">
             <div className="flex items-center justify-center md:justify-start text-xl font-black text-slate-900 dark:text-white">
-              <span>F</span>
-              <span className="inline-flex items-center justify-center w-5 h-5 mx-0.5 rounded-full bg-emerald-500 text-white text-xs font-bold">
+              <span>HMT</span>
+              <span className="inline-flex items-center justify-center w-5 h-5 mx-1 rounded-full bg-emerald-500 text-white text-xs font-bold">
                 ⚡
               </span>
-              <span>rumFlash</span>
+              <span>Flash</span>
               <span className="text-emerald-500 font-extrabold">.</span>
             </div>
             <p className="text-xs text-slate-400 mt-1">
@@ -56,7 +56,7 @@ export function Footer({ onNavigate }: FooterProps) {
         </div>
 
         <div className="pt-6 flex flex-col sm:flex-row items-center justify-between text-slate-400 text-xs gap-3">
-          <p>© 2026 ForumFlash. Phát triển từ The Forum Center.</p>
+          <p>© 2026 HMT Flash. Phát triển từ HMT Center.</p>
           <p className="text-[11px]">Hệ thống Gamification Cây tri thức & 101 bài học chuẩn quốc tế.</p>
         </div>
       </div>

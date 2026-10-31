@@ -1,6 +1,6 @@
-# ForumFlash Study - 100% Clone Platform
+# HMT Flash Study - Nền tảng Học Tiếng Anh Thông Minh
 
-Bản sao hoàn chỉnh 100% tính năng và bộ dữ liệu nguyên bản từ [forumflashstudy.com](https://www.forumflashstudy.com/home), xây dựng trên nền tảng **Next.js 15 (App Router)**, **TypeScript**, **Tailwind CSS** và **Supabase**.
+Ứng dụng học tiếng Anh toàn diện phát triển từ **HMT Center**, xây dựng trên nền tảng **Next.js 15 (App Router)**, **TypeScript**, **Tailwind CSS** và **Supabase**.
 
 ---
 

@@ -1,5 +1,5 @@
 -- ============================================================
--- FORUMFLASH STUDY - SUPABASE DATABASE SCHEMA
+-- HMT FLASH STUDY - SUPABASE DATABASE SCHEMA
 -- Execute this script in your Supabase SQL Editor
 -- ============================================================
 
