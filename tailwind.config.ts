@@ -27,12 +27,19 @@ const config: Config = {
       },
       fontFamily: {
         sans: [
+          "var(--font-lexend)",
+          "Lexend",
           "-apple-system",
           "BlinkMacSystemFont",
           "Segoe UI",
           "Roboto",
           "Helvetica Neue",
           "Arial",
+          "sans-serif",
+        ],
+        lexend: [
+          "var(--font-lexend)",
+          "Lexend",
           "sans-serif",
         ],
         mono: [

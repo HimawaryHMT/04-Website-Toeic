@@ -7,7 +7,7 @@ import { useLearning } from '@/lib/store';
 import { LessonDrawer } from './LessonDrawer';
 import { FlashcardPlayer } from '@/components/flashcard/FlashcardPlayer';
 import { QuizPlayer } from '@/components/quiz/QuizPlayer';
-import { BookOpen, Layers, GraduationCap, Lock, CheckCircle, Star, Sparkles } from 'lucide-react';
+import { BookOpen, Layers, GraduationCap, Star, Sparkles } from 'lucide-react';
 
 interface RoadmapViewProps {
   initialTrack?: 'grammar' | 'topics' | 'cefr';

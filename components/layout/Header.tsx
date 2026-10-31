@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useLearning } from '@/lib/store';
 import { AuthModal } from '@/components/auth/AuthModal';
-import { Sun, Moon, Laptop, LogOut, User, Flame, ChevronDown, Check } from 'lucide-react';
+import { Sun, Moon, Laptop, LogOut, Flame, ChevronDown } from 'lucide-react';
 
 interface HeaderProps {
   currentView: 'home' | 'path' | 'review' | 'history';
@@ -168,99 +168,77 @@ export function Header({ currentView, onNavigate }: HeaderProps) {
               </span>
             </button>
 
-            {/* Account Dropdown */}
-            <div className="relative" ref={menuRef}>
+            {/* Account Area */}
+            {!user ? (
               <button
-                onClick={() => setAccountMenuOpen(!accountMenuOpen)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 hover:border-emerald-500 transition-all text-xs font-semibold cursor-pointer"
+                onClick={() => {
+                  setAuthDefaultTab('login');
+                  setAuthModalOpen(true);
+                }}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 hover:border-emerald-500 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/30 transition-all text-xs font-semibold cursor-pointer"
               >
                 <div className="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 flex items-center justify-center font-bold text-[11px]">
-                  {user ? (user.email?.[0] || 'U').toUpperCase() : '↗'}
+                  ↗
                 </div>
-                <span className="max-w-[90px] truncate text-slate-700 dark:text-slate-200">
-                  {user ? user.user_metadata?.display_name || user.email?.split('@')[0] : 'Đăng nhập'}
+                <span className="text-slate-700 dark:text-slate-200 font-bold">
+                  {language === 'vi' ? 'Đăng nhập' : 'Log in'}
                 </span>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
               </button>
+            ) : (
+              <div className="relative" ref={menuRef}>
+                <button
+                  onClick={() => setAccountMenuOpen(!accountMenuOpen)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 hover:border-emerald-500 transition-all text-xs font-semibold cursor-pointer"
+                >
+                  <div className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-[11px]">
+                    {(user.email?.[0] || 'U').toUpperCase()}
+                  </div>
+                  <span className="max-w-[100px] truncate text-slate-700 dark:text-slate-200">
+                    {user.user_metadata?.display_name || user.email?.split('@')[0]}
+                  </span>
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                </button>
 
-              {/* Dropdown Menu */}
-              {accountMenuOpen && (
-                <div className="absolute right-0 mt-2 w-72 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-4 text-xs z-50 animate-fade-in">
-                  {!user ? (
-                    <div>
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 mb-1">
-                        CHẾ ĐỘ HỌC THỬ
-                      </p>
-                      <p className="font-bold text-slate-900 dark:text-white text-sm mb-1">
-                        Tiến độ chưa được lưu đám mây
-                      </p>
-                      <p className="text-slate-500 dark:text-slate-400 text-xs mb-3">
-                        Tài khoản khách chỉ lưu tiến độ trên trình duyệt này. Hãy đăng ký để lưu tiến độ lâu dài.
-                      </p>
-
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => {
-                            setAccountMenuOpen(false);
-                            setAuthDefaultTab('login');
-                            setAuthModalOpen(true);
-                          }}
-                          className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl text-center transition-colors cursor-pointer"
-                        >
-                          Đăng nhập
-                        </button>
-                        <button
-                          onClick={() => {
-                            setAccountMenuOpen(false);
-                            setAuthDefaultTab('register');
-                            setAuthModalOpen(true);
-                          }}
-                          className="flex-1 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-semibold rounded-xl text-center transition-colors cursor-pointer"
-                        >
-                          Đăng ký
-                        </button>
+                {/* Dropdown Menu for Logged In User */}
+                {accountMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-72 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-4 text-xs z-50 animate-fade-in">
+                    <div className="flex items-center gap-3 mb-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+                      <div className="w-9 h-9 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-sm">
+                        {(user.email?.[0] || 'U').toUpperCase()}
+                      </div>
+                      <div className="overflow-hidden">
+                        <p className="font-bold text-slate-900 dark:text-white text-sm truncate">
+                          {user.user_metadata?.display_name || 'Người học'}
+                        </p>
+                        <p className="text-slate-400 text-[11px] truncate">{user.email}</p>
                       </div>
                     </div>
-                  ) : (
-                    <div>
-                      <div className="flex items-center gap-3 mb-3 pb-3 border-b border-slate-100 dark:border-slate-800">
-                        <div className="w-9 h-9 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-sm">
-                          {(user.email?.[0] || 'U').toUpperCase()}
-                        </div>
-                        <div className="overflow-hidden">
-                          <p className="font-bold text-slate-900 dark:text-white text-sm truncate">
-                            {user.user_metadata?.display_name || 'Người học'}
-                          </p>
-                          <p className="text-slate-400 text-[11px] truncate">{user.email}</p>
-                        </div>
-                      </div>
 
-                      <div className="space-y-1 mb-3">
-                        <div className="flex justify-between py-1 text-slate-600 dark:text-slate-300">
-                          <span>Tổng XP:</span>
-                          <span className="font-bold text-emerald-600">{state.totalXp.toLocaleString()} XP</span>
-                        </div>
-                        <div className="flex justify-between py-1 text-slate-600 dark:text-slate-300">
-                          <span>Chuỗi Streak:</span>
-                          <span className="font-bold text-amber-500">{state.streak} ngày</span>
-                        </div>
+                    <div className="space-y-1 mb-3">
+                      <div className="flex justify-between py-1 text-slate-600 dark:text-slate-300">
+                        <span>Tổng XP:</span>
+                        <span className="font-bold text-emerald-600">{state.totalXp.toLocaleString()} XP</span>
                       </div>
-
-                      <button
-                        onClick={() => {
-                          signOut();
-                          setAccountMenuOpen(false);
-                        }}
-                        className="w-full flex items-center justify-center gap-2 py-2 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl font-semibold transition-colors cursor-pointer"
-                      >
-                        <LogOut className="w-3.5 h-3.5" />
-                        <span>Đăng xuất</span>
-                      </button>
+                      <div className="flex justify-between py-1 text-slate-600 dark:text-slate-300">
+                        <span>Chuỗi Streak:</span>
+                        <span className="font-bold text-amber-500">{state.streak} ngày</span>
+                      </div>
                     </div>
-                  )}
-                </div>
-              )}
-            </div>
+
+                    <button
+                      onClick={() => {
+                        signOut();
+                        setAccountMenuOpen(false);
+                      }}
+                      className="w-full flex items-center justify-center gap-2 py-2 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl font-semibold transition-colors cursor-pointer"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span>Đăng xuất</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
