@@ -8,7 +8,7 @@ export interface GrammarUseCase {
 
 export interface GrammarQuestion {
   id?: string;
-  type?: 'choice' | 'fill';
+  type?: 'choice' | 'fill' | 'spot';
   prompt: string;
   sentence?: string;
   options?: string[];
@@ -16,6 +16,7 @@ export interface GrammarQuestion {
   cue?: string;
   hint?: string;
   hintVi?: string;
+  explain?: string;
 }
 
 export interface GrammarLesson {
@@ -31,11 +32,13 @@ export interface GrammarLesson {
     purpose: string;
     useCases: GrammarUseCase[];
   };
-  questions?: {
+  questions?: GrammarQuestion[] | {
     easy?: GrammarQuestion[];
     medium?: GrammarQuestion[];
     hard?: GrammarQuestion[];
   };
+  mediumQuestions?: GrammarQuestion[];
+  hardQuestions?: GrammarQuestion[];
 }
 
 export interface VocabWord {

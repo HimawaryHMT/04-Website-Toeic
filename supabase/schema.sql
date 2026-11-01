@@ -100,7 +100,17 @@ BEGIN
   INSERT INTO public.learning_progress (user_id, state)
   VALUES (
     new.id,
-    '{"totalXp": 0, "streak": 0, "treeStage": 1, "completedLessons": {}, "dailyDate": "", "dailyXp": 0}'::jsonb
+    jsonb_build_object(
+      'totalXp', 0,
+      'streak', 1,
+      'treeStage', 1,
+      'completedLessons', '{}'::jsonb,
+      'lastActiveDate', to_char(NOW(), 'YYYY-MM-DD'),
+      'dailyDate', to_char(NOW(), 'YYYY-MM-DD'),
+      'dailyXp', 0,
+      'dailyLevels', 0,
+      'dailyCorrect', 0
+    )
   );
 
   RETURN new;
