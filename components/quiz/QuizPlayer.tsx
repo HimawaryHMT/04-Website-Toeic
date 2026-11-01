@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { GrammarLesson, GrammarQuestion } from '@/lib/types';
 import { useLearning } from '@/lib/store';
 import { lookupWord } from '@/lib/curriculum';
 import { TapSentence, TapToLookupModal } from './TapToLookupModal';
-import { X, Check, ArrowRight, RotateCcw, Award, Clock } from 'lucide-react';
+import { X, Check, ArrowRight, RotateCcw, Award, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 interface QuizPlayerProps {
@@ -18,16 +18,56 @@ interface QuizPlayerProps {
 export function QuizPlayer({ lesson, level, onExit, onNextLesson }: QuizPlayerProps) {
   const { recordQuizAttempt } = useLearning();
 
-  // Extract questions according to selected level
-  const questions: GrammarQuestion[] = lesson.questions?.[level] || [
-    {
-      prompt: `Chọn đáp án đúng theo quy tắc: ${lesson.title}`,
-      sentence: lesson.example || 'This is ___ student.',
-      options: ['a', 'an', 'the', 'some'],
-      answer: 'a',
-      type: 'choice',
-    },
-  ];
+  // Extract questions according to selected level (easy, medium, hard)
+  const questions: GrammarQuestion[] = useMemo(() => {
+    let list: GrammarQuestion[] = [];
+    if (level === 'hard') {
+      if (Array.isArray(lesson.hardQuestions) && lesson.hardQuestions.length > 0) {
+        list = lesson.hardQuestions;
+      } else if (lesson.questions && !Array.isArray(lesson.questions) && lesson.questions.hard) {
+        list = lesson.questions.hard;
+      }
+    } else if (level === 'medium') {
+      if (Array.isArray(lesson.mediumQuestions) && lesson.mediumQuestions.length > 0) {
+        list = lesson.mediumQuestions;
+      } else if (lesson.questions && !Array.isArray(lesson.questions) && lesson.questions.medium) {
+        list = lesson.questions.medium;
+      }
+    } else {
+      // easy level
+      if (Array.isArray(lesson.questions) && lesson.questions.length > 0) {
+        list = lesson.questions;
+      } else if (lesson.questions && !Array.isArray(lesson.questions) && lesson.questions.easy) {
+        list = lesson.questions.easy;
+      }
+    }
+
+    // Fallbacks if current level list is empty
+    if (!list || list.length === 0) {
+      if (Array.isArray(lesson.questions) && lesson.questions.length > 0) {
+        list = lesson.questions;
+      } else if (Array.isArray(lesson.mediumQuestions) && lesson.mediumQuestions.length > 0) {
+        list = lesson.mediumQuestions;
+      } else if (Array.isArray(lesson.hardQuestions) && lesson.hardQuestions.length > 0) {
+        list = lesson.hardQuestions;
+      }
+    }
+
+    if (list && list.length > 0) {
+      // 10 questions per quiz session for optimal focus and pacing
+      return list.slice(0, 10);
+    }
+
+    return [
+      {
+        prompt: `Chọn đáp án đúng theo quy tắc: ${lesson.title}`,
+        sentence: lesson.example || 'This is ___ student.',
+        options: ['a', 'an', 'the', 'some'],
+        answer: 'a',
+        type: 'choice',
+      },
+    ];
+  }, [lesson, level]);
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<string>('');
@@ -38,7 +78,7 @@ export function QuizPlayer({ lesson, level, onExit, onNextLesson }: QuizPlayerPr
   const [isCompleted, setIsCompleted] = useState(false);
 
   // Timer
-  const [timeLeft, setTimeLeft] = useState(25);
+  const [timeLeft, setTimeLeft] = useState(30);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Tap-to-lookup state
@@ -49,7 +89,7 @@ export function QuizPlayer({ lesson, level, onExit, onNextLesson }: QuizPlayerPr
 
   // Reset timer on each question
   useEffect(() => {
-    setTimeLeft(25);
+    setTimeLeft(30);
     setIsAnswered(false);
     setSelectedAnswer('');
     setFillInput('');
@@ -359,29 +399,39 @@ export function QuizPlayer({ lesson, level, onExit, onNextLesson }: QuizPlayerPr
                     </button>
                   )}
                 </div>
+              </form>
+            )}
 
-                {isAnswered && (
-                  <div
-                    className={`p-3 rounded-xl text-xs font-semibold flex items-center gap-2 ${
-                      isCorrect
-                        ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                        : 'bg-rose-50 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
-                    }`}
-                  >
-                    {isCorrect ? (
-                      <>
-                        <Check className="w-4 h-4 text-emerald-600" />
-                        <span>Chính xác! Đáp án đúng: {currentQ.answer}</span>
-                      </>
-                    ) : (
-                      <>
-                        <X className="w-4 h-4 text-rose-600" />
-                        <span>Chưa chính xác! Đáp án đúng là: <b>{currentQ.answer}</b></span>
-                      </>
-                    )}
+            {/* Feedback & Detailed Explanation Box */}
+            {isAnswered && (
+              <div
+                className={`p-4 rounded-2xl mb-6 text-sm animate-fade-in border ${
+                  isCorrect
+                    ? 'bg-emerald-50/80 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200'
+                    : 'bg-rose-50/80 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800 text-rose-900 dark:text-rose-200'
+                }`}
+              >
+                <div className="flex items-center gap-2 font-bold mb-1 text-sm">
+                  {isCorrect ? (
+                    <>
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      <span>Chính xác! Đáp án đúng: <b className="underline font-bold">{currentQ.answer}</b></span>
+                    </>
+                  ) : (
+                    <>
+                      <AlertCircle className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0" />
+                      <span>Chưa chính xác! Đáp án đúng là: <b className="underline font-bold">{currentQ.answer}</b></span>
+                    </>
+                  )}
+                </div>
+
+                {currentQ.explain && (
+                  <div className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 mt-2.5 leading-relaxed bg-white/80 dark:bg-slate-900/80 p-3.5 rounded-xl border border-slate-200/60 dark:border-slate-800/60 shadow-xs">
+                    <span className="font-bold text-slate-900 dark:text-white">💡 Giải thích chi tiết: </span>
+                    <span>{currentQ.explain}</span>
                   </div>
                 )}
-              </form>
+              </div>
             )}
 
             {/* Next Question Button once answered */}

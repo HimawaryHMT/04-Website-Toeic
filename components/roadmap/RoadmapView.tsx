@@ -196,36 +196,55 @@ export function RoadmapView({ initialTrack = 'grammar' }: RoadmapViewProps) {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {topicDecks.map((deck) => (
-              <div
-                key={deck.id}
-                onClick={() => setSelectedDeck(deck)}
-                className="group p-6 rounded-3xl bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-800 hover:border-amber-500/50 hover:shadow-xl transition-all cursor-pointer flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300">
-                      {deck.eyebrow || 'IELTS TOPIC'}
-                    </span>
-                    <span className="text-xs font-bold text-slate-400">
-                      {deck.items.length} từ
-                    </span>
+            {topicDecks.map((deck) => {
+              const prog = state.deckProgress?.[deck.id];
+              const hasStarted = prog && prog.lastIndex > 0;
+              const currentCardNum = (prog?.lastIndex ?? 0) + 1;
+              const percent = Math.min(100, Math.round((currentCardNum / deck.items.length) * 100));
+
+              return (
+                <div
+                  key={deck.id}
+                  onClick={() => setSelectedDeck(deck)}
+                  className="group p-6 rounded-3xl bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-800 hover:border-amber-500/50 hover:shadow-xl transition-all cursor-pointer flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300">
+                        {deck.eyebrow || 'IELTS TOPIC'}
+                      </span>
+                      <span className="text-xs font-bold text-slate-400">
+                        {deck.items.length} từ
+                      </span>
+                    </div>
+
+                    <h4 className="text-lg font-black text-slate-900 dark:text-white group-hover:text-amber-600 transition-colors">
+                      {deck.title}
+                    </h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 line-clamp-2">
+                      {deck.description}
+                    </p>
+
+                    {hasStarted && (
+                      <div className="mt-4">
+                        <div className="flex justify-between text-[11px] font-bold text-amber-600 dark:text-amber-400 mb-1">
+                          <span>Đang học: từ {currentCardNum}/{deck.items.length}</span>
+                          <span>{percent}%</span>
+                        </div>
+                        <div className="w-full bg-slate-100 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
+                          <div className="bg-amber-500 h-full rounded-full transition-all" style={{ width: `${percent}%` }} />
+                        </div>
+                      </div>
+                    )}
                   </div>
 
-                  <h4 className="text-lg font-black text-slate-900 dark:text-white group-hover:text-amber-600 transition-colors">
-                    {deck.title}
-                  </h4>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 line-clamp-3">
-                    {deck.description}
-                  </p>
+                  <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs font-bold text-amber-600">
+                    <span>{hasStarted ? `Tiếp tục (từ ${currentCardNum})` : 'Học bằng Flashcard'}</span>
+                    <span>{hasStarted ? 'Tiếp tục →' : 'Luyện ngay →'}</span>
+                  </div>
                 </div>
-
-                <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs font-bold text-amber-600">
-                  <span>Học bằng Flashcard</span>
-                  <span>Luyện ngay →</span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -243,36 +262,55 @@ export function RoadmapView({ initialTrack = 'grammar' }: RoadmapViewProps) {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {cefrDecks.map((deck) => (
-              <div
-                key={deck.id}
-                onClick={() => setSelectedDeck(deck)}
-                className="group p-6 rounded-3xl bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-800 hover:border-blue-500/50 hover:shadow-xl transition-all cursor-pointer flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
-                      {deck.eyebrow || 'CEFR DECK'}
-                    </span>
-                    <span className="text-xs font-bold text-slate-400">
-                      {deck.items.length} từ
-                    </span>
+            {cefrDecks.map((deck) => {
+              const prog = state.deckProgress?.[deck.id];
+              const hasStarted = prog && prog.lastIndex > 0;
+              const currentCardNum = (prog?.lastIndex ?? 0) + 1;
+              const percent = Math.min(100, Math.round((currentCardNum / deck.items.length) * 100));
+
+              return (
+                <div
+                  key={deck.id}
+                  onClick={() => setSelectedDeck(deck)}
+                  className="group p-6 rounded-3xl bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-800 hover:border-blue-500/50 hover:shadow-xl transition-all cursor-pointer flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
+                        {deck.eyebrow || 'CEFR DECK'}
+                      </span>
+                      <span className="text-xs font-bold text-slate-400">
+                        {deck.items.length} từ
+                      </span>
+                    </div>
+
+                    <h4 className="text-lg font-black text-slate-900 dark:text-white group-hover:text-blue-600 transition-colors">
+                      {deck.title}
+                    </h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 line-clamp-2">
+                      {deck.description}
+                    </p>
+
+                    {hasStarted && (
+                      <div className="mt-4">
+                        <div className="flex justify-between text-[11px] font-bold text-blue-600 dark:text-blue-400 mb-1">
+                          <span>Đang học: từ {currentCardNum}/{deck.items.length}</span>
+                          <span>{percent}%</span>
+                        </div>
+                        <div className="w-full bg-slate-100 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
+                          <div className="bg-blue-500 h-full rounded-full transition-all" style={{ width: `${percent}%` }} />
+                        </div>
+                      </div>
+                    )}
                   </div>
 
-                  <h4 className="text-lg font-black text-slate-900 dark:text-white group-hover:text-blue-600 transition-colors">
-                    {deck.title}
-                  </h4>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 line-clamp-3">
-                    {deck.description}
-                  </p>
+                  <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs font-bold text-blue-600">
+                    <span>{hasStarted ? `Tiếp tục (từ ${currentCardNum})` : 'Lật thẻ từ vựng'}</span>
+                    <span>{hasStarted ? 'Tiếp tục →' : 'Bắt đầu →'}</span>
+                  </div>
                 </div>
-
-                <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs font-bold text-blue-600">
-                  <span>Lật thẻ từ vựng</span>
-                  <span>Bắt đầu →</span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

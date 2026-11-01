@@ -8,7 +8,7 @@ export interface GrammarUseCase {
 
 export interface GrammarQuestion {
   id?: string;
-  type?: 'choice' | 'fill';
+  type?: 'choice' | 'fill' | 'spot';
   prompt: string;
   sentence?: string;
   options?: string[];
@@ -16,6 +16,7 @@ export interface GrammarQuestion {
   cue?: string;
   hint?: string;
   hintVi?: string;
+  explain?: string;
 }
 
 export interface GrammarLesson {
@@ -31,11 +32,13 @@ export interface GrammarLesson {
     purpose: string;
     useCases: GrammarUseCase[];
   };
-  questions?: {
+  questions?: GrammarQuestion[] | {
     easy?: GrammarQuestion[];
     medium?: GrammarQuestion[];
     hard?: GrammarQuestion[];
   };
+  mediumQuestions?: GrammarQuestion[];
+  hardQuestions?: GrammarQuestion[];
 }
 
 export interface VocabWord {
@@ -96,6 +99,13 @@ export interface UserPreferences {
   sound: boolean;
 }
 
+export interface DeckProgress {
+  lastIndex: number;
+  exploredCount: number;
+  totalCards: number;
+  lastStudiedAt: string;
+}
+
 export interface LearningState {
   totalXp: number;
   treeStage: number;
@@ -107,6 +117,7 @@ export interface LearningState {
   dailyCorrect: number;
   completedLessons: Record<string, { rating: number; bestScore: number; attempts: number }>;
   notebook: Record<string, BookmarkedWord>;
+  deckProgress?: Record<string, DeckProgress>;
   history: QuizAttempt[];
   preferences: UserPreferences;
 }
