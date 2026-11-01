@@ -99,6 +99,13 @@ export interface UserPreferences {
   sound: boolean;
 }
 
+export interface DeckProgress {
+  lastIndex: number;
+  exploredCount: number;
+  totalCards: number;
+  lastStudiedAt: string;
+}
+
 export interface LearningState {
   totalXp: number;
   treeStage: number;
@@ -110,6 +117,7 @@ export interface LearningState {
   dailyCorrect: number;
   completedLessons: Record<string, { rating: number; bestScore: number; attempts: number }>;
   notebook: Record<string, BookmarkedWord>;
+  deckProgress?: Record<string, DeckProgress>;
   history: QuizAttempt[];
   preferences: UserPreferences;
 }

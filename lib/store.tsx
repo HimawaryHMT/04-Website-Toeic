@@ -65,6 +65,7 @@ const DEFAULT_STATE: LearningState = {
   dailyCorrect: 0,
   completedLessons: {},
   notebook: {},
+  deckProgress: {},
   history: [],
   preferences: DEFAULT_PREFERENCES,
 };
@@ -77,6 +78,8 @@ interface LearningContextType {
   recordQuizAttempt: (attempt: Omit<QuizAttempt, 'id' | 'completedAt'>) => void;
   toggleBookmark: (word: VocabWord, deckId?: string) => boolean;
   isBookmarked: (wordTerm: string) => boolean;
+  saveDeckProgress: (deckId: string, currentIndex: number, totalCards: number) => void;
+  resetDeckProgress: (deckId: string) => void;
   updatePreferences: (partial: Partial<UserPreferences>) => void;
   refreshUser: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -209,6 +212,10 @@ export function LearningProvider({ children }: { children: React.ReactNode }) {
             notebook: {
               ...(remote.notebook || {}),
               ...prev.notebook,
+            },
+            deckProgress: {
+              ...(remote.deckProgress || {}),
+              ...(prev.deckProgress || {}),
             },
             history: [...(remote.history || []), ...(prev.history || [])].slice(0, 100),
             preferences: {
@@ -417,6 +424,60 @@ export function LearningProvider({ children }: { children: React.ReactNode }) {
     [state.notebook]
   );
 
+  const saveDeckProgress = useCallback(
+    (deckId: string, currentIndex: number, totalCards: number) => {
+      const today = getLocalTodayDateString();
+      setState((prev) => {
+        const prevProg = prev.deckProgress?.[deckId];
+        const explored = Math.max(prevProg?.exploredCount || 0, currentIndex + 1);
+        const updatedDeckProgress = {
+          ...(prev.deckProgress || {}),
+          [deckId]: {
+            lastIndex: currentIndex,
+            exploredCount: Math.min(explored, totalCards),
+            totalCards,
+            lastStudiedAt: new Date().toISOString(),
+          },
+        };
+
+        const next: LearningState = {
+          ...prev,
+          lastActiveDate: today,
+          dailyDate: today,
+          deckProgress: updatedDeckProgress,
+        };
+
+        saveState(next);
+        return next;
+      });
+    },
+    [saveState]
+  );
+
+  const resetDeckProgress = useCallback(
+    (deckId: string) => {
+      setState((prev) => {
+        const prevProg = prev.deckProgress?.[deckId];
+        const updatedDeckProgress = {
+          ...(prev.deckProgress || {}),
+          [deckId]: {
+            lastIndex: 0,
+            exploredCount: prevProg?.exploredCount || 0,
+            totalCards: prevProg?.totalCards || 0,
+            lastStudiedAt: new Date().toISOString(),
+          },
+        };
+        const next: LearningState = {
+          ...prev,
+          deckProgress: updatedDeckProgress,
+        };
+        saveState(next);
+        return next;
+      });
+    },
+    [saveState]
+  );
+
   const updatePreferences = useCallback(
     (partial: Partial<UserPreferences>) => {
       saveState({
@@ -447,6 +508,8 @@ export function LearningProvider({ children }: { children: React.ReactNode }) {
         recordQuizAttempt,
         toggleBookmark,
         isBookmarked,
+        saveDeckProgress,
+        resetDeckProgress,
         updatePreferences,
         refreshUser,
         signOut,
