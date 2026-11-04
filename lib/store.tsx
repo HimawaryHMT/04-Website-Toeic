@@ -4,7 +4,9 @@ import React, { createContext, useContext, useEffect, useState, useRef, useCallb
 import { LearningState, QuizAttempt, VocabWord, BookmarkedWord, UserPreferences } from './types';
 import { supabase } from './supabase';
 
-const STORAGE_KEY = 'forumflash_progress_v1';
+export function getStorageKey(userId?: string | null): string {
+  return userId ? `forumflash_progress_user_${userId}` : 'forumflash_progress_guest';
+}
 
 export function getLocalTodayDateString(): string {
   const now = new Date();
@@ -70,6 +72,163 @@ const DEFAULT_STATE: LearningState = {
   preferences: DEFAULT_PREFERENCES,
 };
 
+export function computeDailyAndStreak(rawState: Partial<LearningState>): LearningState {
+  const today = getLocalTodayDateString();
+  const lastActive = rawState.lastActiveDate || rawState.dailyDate || '';
+  let streak = Math.max(1, rawState.streak || 1);
+
+  if (lastActive) {
+    const diff = getDaysDifference(lastActive, today);
+    if (diff === 1) {
+      streak += 1;
+    } else if (diff > 1) {
+      streak = 1;
+    }
+  }
+
+  return {
+    ...DEFAULT_STATE,
+    ...rawState,
+    totalXp: Math.max(0, rawState.totalXp || 0),
+    treeStage: Math.max(1, rawState.treeStage || 1),
+    streak,
+    lastActiveDate: today,
+    dailyDate: today,
+    dailyXp: (rawState.dailyDate === today ? rawState.dailyXp : 0) || 0,
+    dailyLevels: (rawState.dailyDate === today ? rawState.dailyLevels : 0) || 0,
+    dailyCorrect: (rawState.dailyDate === today ? rawState.dailyCorrect : 0) || 0,
+    completedLessons: rawState.completedLessons || {},
+    notebook: rawState.notebook || {},
+    deckProgress: rawState.deckProgress || {},
+    history: (rawState.history || []).slice(0, 100),
+    preferences: {
+      ...DEFAULT_PREFERENCES,
+      ...(rawState.preferences || {}),
+    },
+  };
+}
+
+export function loadLocalState(userId?: string | null): LearningState {
+  if (typeof window === 'undefined') {
+    return {
+      ...DEFAULT_STATE,
+      lastActiveDate: getLocalTodayDateString(),
+      dailyDate: getLocalTodayDateString(),
+    };
+  }
+
+  const key = getStorageKey(userId);
+  try {
+    const saved = localStorage.getItem(key);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return computeDailyAndStreak(parsed);
+    }
+  } catch (e) {
+    console.warn(`Failed to load local progress for ${key}:`, e);
+  }
+
+  const today = getLocalTodayDateString();
+  return {
+    ...DEFAULT_STATE,
+    lastActiveDate: today,
+    dailyDate: today,
+  };
+}
+
+/**
+ * Intelligently merge the local cache and remote cloud state for the SAME authenticated user.
+ * Preserves the highest progress made on either local device or remote DB without cross-user bleeding.
+ */
+export function mergeUserStates(
+  local: Partial<LearningState>,
+  remote: Partial<LearningState>
+): LearningState {
+  const today = getLocalTodayDateString();
+
+  // 1. Merge deck progress (take highest explored count & last index per deck)
+  const mergedDeckProgress: Record<string, any> = {
+    ...(remote.deckProgress || {}),
+  };
+  if (local.deckProgress) {
+    for (const [deckId, prog] of Object.entries(local.deckProgress)) {
+      const existing = mergedDeckProgress[deckId];
+      if (!existing) {
+        mergedDeckProgress[deckId] = prog;
+      } else {
+        mergedDeckProgress[deckId] = {
+          lastIndex: Math.max(existing.lastIndex ?? 0, prog.lastIndex ?? 0),
+          exploredCount: Math.max(existing.exploredCount ?? 0, prog.exploredCount ?? 0),
+          totalCards: prog.totalCards || existing.totalCards || 0,
+          lastStudiedAt:
+            prog.lastStudiedAt && existing.lastStudiedAt
+              ? (prog.lastStudiedAt > existing.lastStudiedAt ? prog.lastStudiedAt : existing.lastStudiedAt)
+              : (prog.lastStudiedAt || existing.lastStudiedAt || new Date().toISOString()),
+        };
+      }
+    }
+  }
+
+  // 2. Merge completed lessons (take best scores & ratings)
+  const mergedCompletedLessons: Record<string, any> = {
+    ...(remote.completedLessons || {}),
+  };
+  if (local.completedLessons) {
+    for (const [lessonId, comp] of Object.entries(local.completedLessons)) {
+      const existing = mergedCompletedLessons[lessonId];
+      if (!existing) {
+        mergedCompletedLessons[lessonId] = comp;
+      } else {
+        mergedCompletedLessons[lessonId] = {
+          rating: Math.max(existing.rating ?? 0, comp.rating ?? 0),
+          bestScore: Math.max(existing.bestScore ?? 0, comp.bestScore ?? 0),
+          attempts: Math.max(existing.attempts ?? 0, comp.attempts ?? 0),
+        };
+      }
+    }
+  }
+
+  // 3. Merge notebook bookmarks
+  const mergedNotebook = {
+    ...(remote.notebook || {}),
+    ...(local.notebook || {}),
+  };
+
+  // 4. Merge quiz history (unique by attempt ID)
+  const historyMap = new Map<string, QuizAttempt>();
+  for (const h of remote.history || []) {
+    if (h && h.id) historyMap.set(h.id, h);
+  }
+  for (const h of local.history || []) {
+    if (h && h.id) historyMap.set(h.id, h);
+  }
+  const mergedHistory = Array.from(historyMap.values())
+    .sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime())
+    .slice(0, 100);
+
+  const rawMerged: Partial<LearningState> = {
+    totalXp: Math.max(local.totalXp || 0, remote.totalXp || 0),
+    treeStage: Math.max(local.treeStage || 1, remote.treeStage || 1),
+    streak: Math.max(local.streak || 1, remote.streak || 1),
+    lastActiveDate: local.lastActiveDate || remote.lastActiveDate || today,
+    dailyDate: today,
+    dailyXp: (local.dailyDate === today ? local.dailyXp : 0) || (remote.dailyDate === today ? remote.dailyXp : 0) || 0,
+    dailyLevels: (local.dailyDate === today ? local.dailyLevels : 0) || (remote.dailyDate === today ? remote.dailyLevels : 0) || 0,
+    dailyCorrect: (local.dailyDate === today ? local.dailyCorrect : 0) || (remote.dailyDate === today ? remote.dailyCorrect : 0) || 0,
+    completedLessons: mergedCompletedLessons,
+    notebook: mergedNotebook,
+    deckProgress: mergedDeckProgress,
+    history: mergedHistory,
+    preferences: {
+      ...DEFAULT_PREFERENCES,
+      ...(remote.preferences || {}),
+      ...(local.preferences || {}),
+    },
+  };
+
+  return computeDailyAndStreak(rawMerged);
+}
+
 interface LearningContextType {
   state: LearningState;
   user: any | null;
@@ -80,8 +239,9 @@ interface LearningContextType {
   isBookmarked: (wordTerm: string) => boolean;
   saveDeckProgress: (deckId: string, currentIndex: number, totalCards: number) => void;
   resetDeckProgress: (deckId: string) => void;
+  resetAccountProgress: () => Promise<void>;
   updatePreferences: (partial: Partial<UserPreferences>) => void;
-  refreshUser: () => Promise<void>;
+  refreshUser: (explicitUser?: any) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -89,212 +249,236 @@ const LearningContext = createContext<LearningContextType | undefined>(undefined
 
 export function LearningProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<LearningState>(DEFAULT_STATE);
+  const stateRef = useRef<LearningState>(DEFAULT_STATE);
   const [user, setUser] = useState<any | null>(null);
+  const userRef = useRef<any | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // 1. Load initial state from LocalStorage
-  useEffect(() => {
+  // Keep references always synced
+  stateRef.current = state;
+  userRef.current = user;
+
+  // Cloud sync helper with onConflict: 'user_id'
+  const syncToCloud = useCallback(async (userId: string, stateToSync: LearningState) => {
+    if (!supabase || !userId) return;
     try {
-      const today = getLocalTodayDateString();
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        const lastActive = parsed.lastActiveDate || parsed.dailyDate || '';
-        let streak = Math.max(1, parsed.streak || 1);
-
-        if (lastActive) {
-          const diff = getDaysDifference(lastActive, today);
-          if (diff === 1) {
-            streak += 1;
-          } else if (diff > 1) {
-            streak = 1;
-          }
-        }
-
-        const nextState: LearningState = {
-          ...DEFAULT_STATE,
-          ...parsed,
-          streak,
-          lastActiveDate: today,
-          dailyDate: today,
-          dailyXp: (parsed.dailyDate === today ? parsed.dailyXp : 0) || 0,
-          dailyLevels: (parsed.dailyDate === today ? parsed.dailyLevels : 0) || 0,
-          dailyCorrect: (parsed.dailyDate === today ? parsed.dailyCorrect : 0) || 0,
-          preferences: {
-            ...DEFAULT_PREFERENCES,
-            ...(parsed.preferences || {}),
-          },
-        };
-
-        setState(nextState);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(nextState));
-      } else {
-        const initial = {
-          ...DEFAULT_STATE,
-          lastActiveDate: today,
-          dailyDate: today,
-        };
-        setState(initial);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
+      const { error } = await supabase.from('learning_progress').upsert(
+        {
+          user_id: userId,
+          state: stateToSync,
+          schema_version: 1,
+          client_updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id' }
+      );
+      if (error) {
+        console.error('Supabase learning_progress upsert error:', error);
       }
-    } catch (e) {
-      console.warn('Failed to load local progress:', e);
-    } finally {
-      setIsLoading(false);
+    } catch (err) {
+      console.warn('Supabase learning_progress upsert exception:', err);
     }
   }, []);
 
-  // 2. Auth listener & cloud sync
-  const refreshUser = useCallback(async () => {
-    if (!supabase) return;
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-
-      if (user) {
-        const today = getLocalTodayDateString();
-
-        // Fetch remote learning progress
-        const { data: progress } = await supabase
-          .from('learning_progress')
-          .select('state')
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-        setState((prev) => {
-          let remote: Partial<LearningState> = {};
-          if (progress?.state) {
-            remote = progress.state as LearningState;
-          }
-
-          // Determine previous active date from all available sources
-          const lastActiveDateCandidate =
-            remote.lastActiveDate ||
-            remote.dailyDate ||
-            (remote.history && remote.history.length > 0 && remote.history[0].completedAt
-              ? getLocalDateStringFromIso(remote.history[0].completedAt)
-              : '') ||
-            (user.last_sign_in_at ? getLocalDateStringFromIso(user.last_sign_in_at) : '') ||
-            (user.created_at ? getLocalDateStringFromIso(user.created_at) : '') ||
-            prev.lastActiveDate ||
-            '';
-
-          let streak = Math.max(1, remote.streak || prev.streak || 1);
-
-          if (lastActiveDateCandidate) {
-            const diff = getDaysDifference(lastActiveDateCandidate, today);
-            if (diff === 1) {
-              // Logged in on consecutive day! Streak increases by 1!
-              streak += 1;
-            } else if (diff > 1) {
-              // Missed more than 1 day
-              streak = 1;
-            }
-            // If diff === 0, same day login, keep current streak
-          }
-
-          const merged: LearningState = {
-            ...DEFAULT_STATE,
-            ...prev,
-            ...remote,
-            totalXp: Math.max(prev.totalXp, remote.totalXp || 0),
-            streak,
-            lastActiveDate: today,
-            dailyDate: today,
-            dailyXp: (remote.dailyDate === today ? remote.dailyXp : prev.dailyDate === today ? prev.dailyXp : 0) || 0,
-            dailyLevels: (remote.dailyDate === today ? remote.dailyLevels : prev.dailyDate === today ? prev.dailyLevels : 0) || 0,
-            dailyCorrect: (remote.dailyDate === today ? remote.dailyCorrect : prev.dailyDate === today ? prev.dailyCorrect : 0) || 0,
-            completedLessons: {
-              ...(remote.completedLessons || {}),
-              ...prev.completedLessons,
-            },
-            notebook: {
-              ...(remote.notebook || {}),
-              ...prev.notebook,
-            },
-            deckProgress: {
-              ...(remote.deckProgress || {}),
-              ...(prev.deckProgress || {}),
-            },
-            history: [...(remote.history || []), ...(prev.history || [])].slice(0, 100),
-            preferences: {
-              ...DEFAULT_PREFERENCES,
-              ...(remote.preferences || {}),
-              ...(prev.preferences || {}),
-            },
-          };
-
-          // Save locally
-          try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
-          } catch (e) {}
-
-          // Immediately persist updated streak and lastActiveDate to Supabase cloud
-          if (supabase && user) {
-            const sb = supabase;
-            sb.from('learning_progress')
-              .upsert({
-                user_id: user.id,
-                state: merged,
-                schema_version: 1,
-                client_updated_at: new Date().toISOString(),
-              })
-              .then(({ error }) => {
-                if (error) console.warn('Supabase learning_progress upsert error:', error);
-              });
-          }
-
-          return merged;
-        });
-      }
-    } catch (e) {
-      console.warn('Supabase auth/sync error:', e);
-    }
-  }, []);
-
-  useEffect(() => {
-    refreshUser();
-    if (supabase) {
-      const { data: authListener } = supabase.auth.onAuthStateChange(() => {
-        refreshUser();
-      });
-      return () => {
-        authListener.subscription.unsubscribe();
-      };
-    }
-  }, [refreshUser]);
-
-  // 3. Save to localStorage & schedule Supabase sync
-  const saveState = useCallback(
+  // Save to user-scoped localStorage & debounce Supabase sync (does NOT call setState)
+  const persistState = useCallback(
     (newState: LearningState) => {
-      setState(newState);
+      stateRef.current = newState;
+      const currentUserId = userRef.current?.id;
+      const key = getStorageKey(currentUserId);
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
+        localStorage.setItem(key, JSON.stringify(newState));
       } catch (e) {
         console.warn('LocalStorage save failed:', e);
       }
 
-      // Sync to cloud if user logged in
-      if (user && supabase) {
-        const sb = supabase;
+      // Debounce sync to cloud if user is logged in
+      if (currentUserId && supabase) {
         if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
-        syncTimeoutRef.current = setTimeout(async () => {
-          try {
-            await sb.from('learning_progress').upsert({
-              user_id: user.id,
-              state: newState,
-              schema_version: 1,
-              client_updated_at: new Date().toISOString(),
-            });
-          } catch (err) {
-            console.warn('Cloud sync error:', err);
-          }
-        }, 800);
+        syncTimeoutRef.current = setTimeout(() => {
+          syncToCloud(currentUserId, newState);
+        }, 500);
       }
     },
-    [user]
+    [syncToCloud]
   );
+
+  // Immediately flush any pending sync to cloud
+  const flushPendingSync = useCallback(async () => {
+    if (syncTimeoutRef.current) {
+      clearTimeout(syncTimeoutRef.current);
+      syncTimeoutRef.current = null;
+    }
+    const currentUserId = userRef.current?.id;
+    if (currentUserId && supabase) {
+      await syncToCloud(currentUserId, stateRef.current);
+    }
+  }, [syncToCloud]);
+
+  // Window unload listener to flush local progress
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      const currentUserId = userRef.current?.id;
+      if (currentUserId) {
+        try {
+          localStorage.setItem(getStorageKey(currentUserId), JSON.stringify(stateRef.current));
+        } catch (e) {}
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
+
+  // refreshUser loads progress STRICTLY for the target user, never bleeding previous user state
+  const refreshUser = useCallback(
+    async (explicitUser?: any) => {
+      let currentUser = explicitUser;
+      if (currentUser === undefined && supabase) {
+        try {
+          const { data: { user: fetchedUser } } = await supabase.auth.getUser();
+          currentUser = fetchedUser;
+        } catch (e) {
+          currentUser = null;
+        }
+      }
+
+      userRef.current = currentUser || null;
+      setUser(currentUser || null);
+
+      if (!currentUser) {
+        // Guest mode: load clean guest state
+        const guestState = loadLocalState(null);
+        stateRef.current = guestState;
+        setState(guestState);
+        return;
+      }
+
+      // Authenticated user: load local cache for THIS user ID
+      const localUserState = loadLocalState(currentUser.id);
+
+      try {
+        if (supabase) {
+          const { data: progress } = await supabase
+            .from('learning_progress')
+            .select('state')
+            .eq('user_id', currentUser.id)
+            .maybeSingle();
+
+          const remoteState =
+            progress?.state && typeof progress.state === 'object'
+              ? (progress.state as Partial<LearningState>)
+              : {};
+
+          // Intelligently merge THIS user's local cache with THIS user's cloud state
+          const targetState = mergeUserStates(localUserState, remoteState);
+
+          stateRef.current = targetState;
+          setState(targetState);
+
+          // Save merged state to user-scoped localStorage
+          try {
+            localStorage.setItem(getStorageKey(currentUser.id), JSON.stringify(targetState));
+          } catch (e) {}
+
+          // Ensure cloud is immediately in sync with onConflict: 'user_id'
+          await syncToCloud(currentUser.id, targetState);
+        } else {
+          stateRef.current = localUserState;
+          setState(localUserState);
+        }
+      } catch (e) {
+        console.warn('Supabase auth/sync error:', e);
+        stateRef.current = localUserState;
+        setState(localUserState);
+      }
+    },
+    [syncToCloud]
+  );
+
+  // Auth listener & initial sync
+  useEffect(() => {
+    let mounted = true;
+
+    // Initial load
+    refreshUser().finally(() => {
+      if (mounted) setIsLoading(false);
+    });
+
+    if (supabase) {
+      const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (!mounted) return;
+        if (event === 'SIGNED_OUT' || !session?.user) {
+          if (syncTimeoutRef.current) {
+            clearTimeout(syncTimeoutRef.current);
+            syncTimeoutRef.current = null;
+          }
+          userRef.current = null;
+          setUser(null);
+          const guestState = loadLocalState(null);
+          stateRef.current = guestState;
+          setState(guestState);
+          setIsLoading(false);
+        } else if (session?.user) {
+          await refreshUser(session.user);
+          setIsLoading(false);
+        }
+      });
+
+      return () => {
+        mounted = false;
+        authListener?.subscription?.unsubscribe();
+      };
+    } else {
+      setIsLoading(false);
+    }
+  }, [refreshUser]);
+
+  // Sign out: cleanly flushes pending cloud saves, resets state, and disconnects user
+  const signOut = useCallback(async () => {
+    await flushPendingSync();
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
+    userRef.current = null;
+    setUser(null);
+    const guestState = loadLocalState(null);
+    stateRef.current = guestState;
+    setState(guestState);
+  }, [flushPendingSync]);
+
+  // Reset account progress: clears progress to 0 and streak to 1 for this account
+  const resetAccountProgress = useCallback(async () => {
+    const today = getLocalTodayDateString();
+    const cleanState: LearningState = {
+      ...DEFAULT_STATE,
+      totalXp: 0,
+      treeStage: 1,
+      streak: 1,
+      lastActiveDate: today,
+      dailyDate: today,
+      dailyXp: 0,
+      dailyLevels: 0,
+      dailyCorrect: 0,
+      completedLessons: {},
+      notebook: {},
+      deckProgress: {},
+      history: [],
+      preferences: stateRef.current.preferences,
+    };
+
+    stateRef.current = cleanState;
+    setState(cleanState);
+    const currentUserId = userRef.current?.id;
+    if (currentUserId) {
+      try {
+        localStorage.setItem(getStorageKey(currentUserId), JSON.stringify(cleanState));
+      } catch (e) {}
+
+      if (supabase) {
+        await syncToCloud(currentUserId, cleanState);
+      }
+    }
+  }, [syncToCloud]);
 
   // Apply theme & text size to HTML element
   useEffect(() => {
@@ -316,11 +500,11 @@ export function LearningProvider({ children }: { children: React.ReactNode }) {
           lastActiveDate: today,
           dailyDate: today,
         };
-        saveState(next);
+        persistState(next);
         return next;
       });
     },
-    [saveState]
+    [persistState]
   );
 
   const recordQuizAttempt = useCallback(
@@ -361,15 +545,16 @@ export function LearningProvider({ children }: { children: React.ReactNode }) {
           history: [attempt, ...prev.history].slice(0, 100),
         };
 
-        saveState(next);
+        persistState(next);
         return next;
       });
 
       // Also record into attempt_history table if Supabase is connected
-      if (user && supabase) {
+      const currentUserId = userRef.current?.id;
+      if (currentUserId && supabase) {
         const sb = supabase;
         sb.from('attempt_history').insert({
-          user_id: user.id,
+          user_id: currentUserId,
           lesson_id: attempt.lessonId,
           lesson_title: attempt.lessonTitle,
           track_id: attempt.trackId,
@@ -381,40 +566,45 @@ export function LearningProvider({ children }: { children: React.ReactNode }) {
         }).then();
       }
     },
-    [user, saveState]
+    [persistState]
   );
 
   const toggleBookmark = useCallback(
     (word: VocabWord, deckId: string = 'general') => {
       const termKey = word.term.toLowerCase().trim();
-      const existing = state.notebook[termKey];
-      const updatedNotebook = { ...state.notebook };
-
       let isNowBookmarked = false;
-      if (existing) {
-        delete updatedNotebook[termKey];
-        isNowBookmarked = false;
-      } else {
-        const item: BookmarkedWord = {
-          word: word.term,
-          deckId,
-          pos: word.pos,
-          meaningVi: word.meaningVi,
-          memoryStatus: 'review',
-          addedAt: new Date().toISOString(),
-        };
-        updatedNotebook[termKey] = item;
-        isNowBookmarked = true;
-      }
 
-      saveState({
-        ...state,
-        notebook: updatedNotebook,
+      setState((prev) => {
+        const existing = prev.notebook[termKey];
+        const updatedNotebook = { ...prev.notebook };
+
+        if (existing) {
+          delete updatedNotebook[termKey];
+          isNowBookmarked = false;
+        } else {
+          const item: BookmarkedWord = {
+            word: word.term,
+            deckId,
+            pos: word.pos,
+            meaningVi: word.meaningVi,
+            memoryStatus: 'review',
+            addedAt: new Date().toISOString(),
+          };
+          updatedNotebook[termKey] = item;
+          isNowBookmarked = true;
+        }
+
+        const next: LearningState = {
+          ...prev,
+          notebook: updatedNotebook,
+        };
+        persistState(next);
+        return next;
       });
 
       return isNowBookmarked;
     },
-    [state, saveState]
+    [persistState]
   );
 
   const isBookmarked = useCallback(
@@ -430,73 +620,66 @@ export function LearningProvider({ children }: { children: React.ReactNode }) {
       setState((prev) => {
         const prevProg = prev.deckProgress?.[deckId];
         const explored = Math.max(prevProg?.exploredCount || 0, currentIndex + 1);
-        const updatedDeckProgress = {
-          ...(prev.deckProgress || {}),
-          [deckId]: {
-            lastIndex: currentIndex,
-            exploredCount: Math.min(explored, totalCards),
-            totalCards,
-            lastStudiedAt: new Date().toISOString(),
-          },
-        };
-
         const next: LearningState = {
           ...prev,
           lastActiveDate: today,
           dailyDate: today,
-          deckProgress: updatedDeckProgress,
+          deckProgress: {
+            ...(prev.deckProgress || {}),
+            [deckId]: {
+              lastIndex: currentIndex,
+              exploredCount: Math.min(explored, totalCards),
+              totalCards,
+              lastStudiedAt: new Date().toISOString(),
+            },
+          },
         };
-
-        saveState(next);
+        persistState(next);
         return next;
       });
     },
-    [saveState]
+    [persistState]
   );
 
   const resetDeckProgress = useCallback(
     (deckId: string) => {
       setState((prev) => {
         const prevProg = prev.deckProgress?.[deckId];
-        const updatedDeckProgress = {
-          ...(prev.deckProgress || {}),
-          [deckId]: {
-            lastIndex: 0,
-            exploredCount: prevProg?.exploredCount || 0,
-            totalCards: prevProg?.totalCards || 0,
-            lastStudiedAt: new Date().toISOString(),
-          },
-        };
         const next: LearningState = {
           ...prev,
-          deckProgress: updatedDeckProgress,
+          deckProgress: {
+            ...(prev.deckProgress || {}),
+            [deckId]: {
+              lastIndex: 0,
+              exploredCount: prevProg?.exploredCount || 0,
+              totalCards: prevProg?.totalCards || 0,
+              lastStudiedAt: new Date().toISOString(),
+            },
+          },
         };
-        saveState(next);
+        persistState(next);
         return next;
       });
     },
-    [saveState]
+    [persistState]
   );
 
   const updatePreferences = useCallback(
     (partial: Partial<UserPreferences>) => {
-      saveState({
-        ...state,
-        preferences: {
-          ...state.preferences,
-          ...partial,
-        },
+      setState((prev) => {
+        const next: LearningState = {
+          ...prev,
+          preferences: {
+            ...prev.preferences,
+            ...partial,
+          },
+        };
+        persistState(next);
+        return next;
       });
     },
-    [state, saveState]
+    [persistState]
   );
-
-  const signOut = useCallback(async () => {
-    if (supabase) {
-      await supabase.auth.signOut();
-      setUser(null);
-    }
-  }, []);
 
   return (
     <LearningContext.Provider
@@ -510,6 +693,7 @@ export function LearningProvider({ children }: { children: React.ReactNode }) {
         isBookmarked,
         saveDeckProgress,
         resetDeckProgress,
+        resetAccountProgress,
         updatePreferences,
         refreshUser,
         signOut,

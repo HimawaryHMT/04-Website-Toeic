@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useLearning } from '@/lib/store';
 import { AuthModal } from '@/components/auth/AuthModal';
-import { Sun, Moon, Laptop, LogOut, Flame, ChevronDown } from 'lucide-react';
+import { Sun, Moon, Laptop, LogOut, Flame, ChevronDown, RotateCcw } from 'lucide-react';
 
 interface HeaderProps {
   currentView: 'home' | 'path' | 'review' | 'history';
@@ -11,7 +11,7 @@ interface HeaderProps {
 }
 
 export function Header({ currentView, onNavigate }: HeaderProps) {
-  const { state, user, updatePreferences, signOut } = useLearning();
+  const { state, user, updatePreferences, signOut, resetAccountProgress } = useLearning();
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authDefaultTab, setAuthDefaultTab] = useState<'login' | 'register'>('login');
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
@@ -224,6 +224,20 @@ export function Header({ currentView, onNavigate }: HeaderProps) {
                         <span className="font-bold text-amber-500">{state.streak} ngày</span>
                       </div>
                     </div>
+
+                    <button
+                      onClick={() => {
+                        if (confirm('Bạn có chắc chắn muốn đặt lại toàn bộ điểm XP, chuỗi Streak và tiến độ bài học của tài khoản này về ban đầu (0 XP, Streak 1 ngày)?')) {
+                          resetAccountProgress();
+                          setAccountMenuOpen(false);
+                        }
+                      }}
+                      className="w-full flex items-center justify-center gap-2 py-1.5 mb-1.5 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 rounded-xl font-medium transition-colors cursor-pointer text-xs"
+                      title="Đặt lại tiến độ về 0 nếu tài khoản này từng bị lưu chéo từ tài khoản khác"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Đặt lại tiến độ tài khoản</span>
+                    </button>
 
                     <button
                       onClick={() => {
