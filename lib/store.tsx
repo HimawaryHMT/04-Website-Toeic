@@ -236,6 +236,8 @@ interface LearningContextType {
   addXp: (amount: number) => void;
   recordQuizAttempt: (attempt: Omit<QuizAttempt, 'id' | 'completedAt'>) => void;
   toggleBookmark: (word: VocabWord, deckId?: string) => boolean;
+  addCustomWord: (custom: { term: string; pos?: string; meaningVi: string }) => void;
+  removeBookmark: (term: string) => void;
   isBookmarked: (wordTerm: string) => boolean;
   saveDeckProgress: (deckId: string, currentIndex: number, totalCards: number) => void;
   resetDeckProgress: (deckId: string) => void;
@@ -607,6 +609,78 @@ export function LearningProvider({ children }: { children: React.ReactNode }) {
     [persistState]
   );
 
+  const addCustomWord = useCallback(
+    (custom: { term: string; pos?: string; meaningVi: string }) => {
+      const termKey = custom.term.toLowerCase().trim();
+      if (!termKey) return;
+
+      setState((prev) => {
+        const item: BookmarkedWord = {
+          word: custom.term.trim(),
+          deckId: 'custom',
+          pos: (custom.pos || 'n').trim(),
+          meaningVi: custom.meaningVi.trim(),
+          memoryStatus: 'review',
+          addedAt: new Date().toISOString(),
+        };
+        const next: LearningState = {
+          ...prev,
+          notebook: {
+            ...prev.notebook,
+            [termKey]: item,
+          },
+        };
+        persistState(next);
+        return next;
+      });
+
+      const currentUserId = userRef.current?.id;
+      if (currentUserId && supabase) {
+        supabase
+          .from('user_notebook')
+          .upsert({
+            user_id: currentUserId,
+            word: custom.term.trim(),
+            deck_id: 'custom',
+            pos: (custom.pos || 'n').trim(),
+            meaning_vi: custom.meaningVi.trim(),
+            memory_level: 0,
+          })
+          .then();
+      }
+    },
+    [persistState]
+  );
+
+  const removeBookmark = useCallback(
+    (term: string) => {
+      const termKey = term.toLowerCase().trim();
+      setState((prev) => {
+        const updatedNotebook = { ...prev.notebook };
+        delete updatedNotebook[termKey];
+        const next: LearningState = {
+          ...prev,
+          notebook: updatedNotebook,
+        };
+        persistState(next);
+        return next;
+      });
+
+      const currentUserId = userRef.current?.id;
+      if (currentUserId && supabase) {
+        supabase
+          .from('user_notebook')
+          .delete()
+          .match({
+            user_id: currentUserId,
+            word: term.trim(),
+          })
+          .then();
+      }
+    },
+    [persistState]
+  );
+
   const isBookmarked = useCallback(
     (wordTerm: string) => {
       return Boolean(state.notebook[wordTerm.toLowerCase().trim()]);
@@ -690,6 +764,8 @@ export function LearningProvider({ children }: { children: React.ReactNode }) {
         addXp,
         recordQuizAttempt,
         toggleBookmark,
+        addCustomWord,
+        removeBookmark,
         isBookmarked,
         saveDeckProgress,
         resetDeckProgress,
